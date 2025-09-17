@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 	"wb_tech/L0/pkg/utils"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 )
 
-type Client interface {
+type PostgresClient interface {
 	Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error)
 	Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error)
 	QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row
@@ -32,7 +33,8 @@ func NewClient(ctx context.Context, maxAttempts int, username, password, host, p
 	}, maxAttempts, time.Second*5)
 
 	if err != nil {
-		fmt.Println("error while doing postgresql connect with tries")
+		log.Println("error while doing postgresql connect with tries")
+		return nil, err
 	}
 
 	return

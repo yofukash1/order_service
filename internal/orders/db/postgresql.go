@@ -1,8 +1,9 @@
-package db
+package orders
 
 import (
 	"context"
 	"fmt"
+	"log"
 	"wb_tech/L0/internal/orders"
 	"wb_tech/L0/pkg/database/postgres"
 
@@ -10,13 +11,18 @@ import (
 )
 
 type repository struct {
-	client postgres.Client
+	client postgres.PostgresClient
 }
 
-func (r *repository) CreatePayment(ctx context.Context, payment *orders.Payment) (transaction string, err error) {
+func NewRepository(client postgres.PostgresClient) orders.Repository {
+	return &repository{client: client}
+}
+
+// Методы для работы в транзакции
+func (r *repository) createPaymentTx(ctx context.Context, tx postgres.PostgresClient, payment *orders.Payment) (string, error) {
 	q := `
-		INSERT INTO payment
-			(transaction,
+		INSERT INTO payments
+			(transaction_id,
 			request_id,
 			currency,	
 			provider,
@@ -29,12 +35,15 @@ func (r *repository) CreatePayment(ctx context.Context, payment *orders.Payment)
 		VALUES 
 			($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		ON CONFLICT DO NOTHING`
-	_, err = r.client.Query(ctx, q, payment.Transaction, payment.RequestID, payment.Currency, payment.Provider,
+
+	_, err := tx.Exec(ctx, q, payment.Transaction, payment.RequestID, payment.Currency, payment.Provider,
 		payment.Amount, payment.PaymentDT, payment.Bank, payment.DeliveryCost, payment.GoodsTotal, payment.CustomFee)
+
 	if err != nil {
 		if pgErr, ok := err.(*pgconn.PgError); ok {
-			newErr := fmt.Errorf(fmt.Sprintf("SQL Error: %s Where: %s Detail: %s Code: %s SQLState: %s", pgErr.Message, pgErr.Where, pgErr.Detail, pgErr.Code, pgErr.SQLState()))
-			fmt.Println(newErr)
+			newErr := fmt.Errorf("SQL Error: %s Where: %s Detail: %s Code: %s SQLState: %s",
+				pgErr.Message, pgErr.Where, pgErr.Detail, pgErr.Code, pgErr.SQLState())
+			log.Println(newErr)
 			return "", newErr
 		}
 		return "", err
@@ -42,25 +51,46 @@ func (r *repository) CreatePayment(ctx context.Context, payment *orders.Payment)
 	return payment.Transaction, nil
 }
 
-func (r *repository) CreateItem(ctx context.Context, orderUID string, item *orders.Item) error {
+func (r *repository) createDeliveryTx(ctx context.Context, tx postgres.PostgresClient, delivery *orders.Delivery) (int, error) {
+	q := `
+		INSERT INTO deliveries (
+			name, phone, zip, city, address, region, email
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT DO NOTHING
+		RETURNING id`
+
+	var deliveryID int
+	err := tx.QueryRow(ctx, q,
+		delivery.Name,
+		delivery.Phone,
+		delivery.Zip,
+		delivery.City,
+		delivery.Address,
+		delivery.Region,
+		delivery.Email,
+	).Scan(&deliveryID)
+
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok {
+			newErr := fmt.Errorf("SQL Error: %s Where: %s Detail: %s Code: %s SQLState: %s",
+				pgErr.Message, pgErr.Where, pgErr.Detail, pgErr.Code, pgErr.SQLState())
+			log.Println(newErr)
+			return 0, newErr
+		}
+		return 0, err
+	}
+	return deliveryID, nil
+}
+
+func (r *repository) createItemTx(ctx context.Context, tx postgres.PostgresClient, orderUID string, item *orders.Item) error {
 	q := `
 		INSERT INTO items (
 			order_uid, chrt_id, track_number, price, rid, name, 
 			sale, size, total_price, nm_id, brand, status
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-		ON CONFLICT (order_uid, chrt_id) DO UPDATE SET
-			track_number = EXCLUDED.track_number,
-			price = EXCLUDED.price,
-			rid = EXCLUDED.rid,
-			name = EXCLUDED.name,
-			sale = EXCLUDED.sale,
-			size = EXCLUDED.size,
-			total_price = EXCLUDED.total_price,
-			nm_id = EXCLUDED.nm_id,
-			brand = EXCLUDED.brand,
-			status = EXCLUDED.status`
+		ON CONFLICT DO NOTHING`
 
-	_, err := r.client.Exec(ctx, q,
+	_, err := tx.Exec(ctx, q,
 		orderUID,
 		item.ChrtID,
 		item.TrackNumber,
@@ -79,7 +109,7 @@ func (r *repository) CreateItem(ctx context.Context, orderUID string, item *orde
 		if pgErr, ok := err.(*pgconn.PgError); ok {
 			newErr := fmt.Errorf("SQL Error: %s Where: %s Detail: %s Code: %s SQLState: %s",
 				pgErr.Message, pgErr.Where, pgErr.Detail, pgErr.Code, pgErr.SQLState())
-			fmt.Println(newErr)
+			log.Println(newErr)
 			return newErr
 		}
 		return err
@@ -87,41 +117,8 @@ func (r *repository) CreateItem(ctx context.Context, orderUID string, item *orde
 	return nil
 }
 
-func (r *repository) CreateDelivery(ctx context.Context, delivery *orders.Delivery) (deliveryID int, err error) {
-	q := `
-		INSERT INTO deliveries (
-			name, phone, zip, city, address, region, email
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (name, phone, email) DO UPDATE SET
-			zip = EXCLUDED.zip,
-			city = EXCLUDED.city,
-			address = EXCLUDED.address,
-			region = EXCLUDED.region
-		RETURNING id`
-
-	err = r.client.QueryRow(ctx, q,
-		delivery.Name,
-		delivery.Phone,
-		delivery.Zip,
-		delivery.City,
-		delivery.Address,
-		delivery.Region,
-		delivery.Email,
-	).Scan(&deliveryID)
-
-	if err != nil {
-		if pgErr, ok := err.(*pgconn.PgError); ok {
-			newErr := fmt.Errorf("SQL Error: %s Where: %s Detail: %s Code: %s SQLState: %s",
-				pgErr.Message, pgErr.Where, pgErr.Detail, pgErr.Code, pgErr.SQLState())
-			fmt.Println(newErr)
-			return 0, newErr
-		}
-		return 0, err
-	}
-	return deliveryID, nil
-}
-
 func (r *repository) CreateOrder(ctx context.Context, order *orders.Order) error {
+	log.Println("SQL: BEGIN TRANSACTION")
 	// Start transaction
 	tx, err := r.client.Begin(ctx)
 	if err != nil {
@@ -129,19 +126,16 @@ func (r *repository) CreateOrder(ctx context.Context, order *orders.Order) error
 	}
 	defer tx.Rollback(ctx)
 
-	// Create payment
-	paymentID, err := r.CreatePayment(ctx, &order.Payment)
+	paymentID, err := r.createPaymentTx(ctx, tx, &order.Payment)
 	if err != nil {
 		return fmt.Errorf("failed to create payment: %w", err)
 	}
 
-	// Create delivery
-	deliveryID, err := r.CreateDelivery(ctx, &order.Delivery)
+	deliveryID, err := r.createDeliveryTx(ctx, tx, &order.Delivery)
 	if err != nil {
 		return fmt.Errorf("failed to create delivery: %w", err)
 	}
 
-	// Create order
 	orderQ := `
 		INSERT INTO orders (
 			order_uid, track_number, entry, delivery_id, payment_id,
@@ -187,9 +181,9 @@ func (r *repository) CreateOrder(ctx context.Context, order *orders.Order) error
 		return fmt.Errorf("failed to create order: %w", err)
 	}
 
-	// Create items
 	for _, item := range order.Items {
-		err := r.CreateItem(ctx, order.OrderUID, &item)
+		log.Println("Trying to add items")
+		err := r.createItemTx(ctx, tx, order.OrderUID, &item)
 		if err != nil {
 			return fmt.Errorf("failed to create item: %w", err)
 		}
@@ -200,7 +194,21 @@ func (r *repository) CreateOrder(ctx context.Context, order *orders.Order) error
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	log.Println("SQL: COMMIT TRANSACTION")
 	return nil
+}
+
+// Оригинальные методы для отдельных операций (no transaction!)
+func (r *repository) CreatePayment(ctx context.Context, payment *orders.Payment) (transaction string, err error) {
+	return r.createPaymentTx(ctx, r.client, payment)
+}
+
+func (r *repository) CreateItem(ctx context.Context, orderUID string, item *orders.Item) error {
+	return r.createItemTx(ctx, r.client, orderUID, item)
+}
+
+func (r *repository) CreateDelivery(ctx context.Context, delivery *orders.Delivery) (deliveryID int, err error) {
+	return r.createDeliveryTx(ctx, r.client, delivery)
 }
 
 // GetOrderByUID retrieves a complete order with all related data
@@ -210,11 +218,11 @@ func (r *repository) GetOrderByUID(ctx context.Context, orderUID string) (*order
 			o.order_uid, o.track_number, o.entry, o.locale, o.internal_signature,
 			o.customer_id, o.delivery_service, o.shardkey, o.sm_id, o.date_created, o.oof_shard,
 			d.name, d.phone, d.zip, d.city, d.address, d.region, d.email,
-			p.transaction, p.request_id, p.currency, p.provider, p.amount, p.payment_dt,
+			p.transaction_id, p.request_id, p.currency, p.provider, p.amount, p.payment_dt,
 			p.bank, p.delivery_cost, p.goods_total, p.custom_fee
 		FROM orders o
 		JOIN deliveries d ON o.delivery_id = d.id
-		JOIN payments p ON o.payment_id = p.transaction
+		JOIN payments p ON o.payment_id = p.transaction_id
 		WHERE o.order_uid = $1`
 
 	var order orders.Order

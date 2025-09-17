@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Результаты поиска заказа</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; font-size: 2.2em; }
+        .search-form { margin-bottom: 30px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .message { text-align: center; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .error { background: #fee; color: #c33; }
+        .success { background: #efe; color: #363; }
+        .order-details {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .order-details h3 { color: #333; margin-bottom: 20px; text-align: center; }
+        .order-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; }
+        .info-item {
+            margin-bottom: 12px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .info-label { font-weight: 600; color: #666; font-size: 0.9em; margin-bottom: 5px; }
+        .info-value { color: #333; font-size: 1.1em; word-break: break-all; }
+        .back-link { display: block; text-align: center; margin-top: 30px; color: #667eea; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Поиск заказа</h1>
+
+        <form class="search-form" method="GET" action="/order">
+            <div class="input-group">
+                <input type="text" id="uid" name="uid" placeholder="Введите UID заказа..." 
+                       value="{{.Query}}" required>
+                <button type="submit">Найти</button>
+            </div>
+        </form>
+
+        {{if .Error}}
+        <div class="message error">
+            <p>{{.Error}}</p>
+        </div>
+        {{else if .Success}}
+        <div class="message success">
+            <p>{{.Success}}</p>
+        </div>
+        {{end}}
+
+        {{if .Order}}
+        <div class="order-details">
+            <h3>Детали заказа</h3>
+            <div class="order-info">
+                <div class="info-item">
+                    <div class="info-label">UID</div>
+                    <div class="info-value">{{.Order.OrderUID}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Трек номер</div>
+                    <div class="info-value">{{.Order.TrackNumber}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Запись</div>
+                    <div class="info-value">{{.Order.Entry}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Локация</div>
+                    <div class="info-value">{{.Order.Locale}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Клиент</div>
+                    <div class="info-value">{{.Order.CustomerID}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Сервис доставки</div>
+                    <div class="info-value">{{.Order.DeliveryService}}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Дата создания</div>
+                    <div class="info-value">{{.Order.DateCreated.Format "2006-01-02 15:04:05"}}</div>
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        <a href="/" class="back-link">← Вернуться к поиску</a>
+    </div>
+</body>
+</html>

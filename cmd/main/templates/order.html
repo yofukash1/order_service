@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск заказа</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 30px; font-size: 2.2em; }
+        .search-form { margin-bottom: 30px; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
+        input[type="text"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        input[type="text"]:focus { outline: none; border-color: #667eea; }
+        button {
+            padding: 15px 30px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s ease;
+        }
+        button:hover { background: #5a67d8; }
+        .message {
+            text-align: center;
+            padding: 20px;
+            margin-top: 20px;
+            border-radius: 8px;
+            font-weight: 500;
+        }
+        .error { background: #fee; border: 1px solid #fcc; color: #c33; }
+        .success { background: #efe; border: 1px solid #cfc; color: #363; }
+        .instructions {
+            background: #e8f4fd;
+            border: 1px solid #b8daf9;
+            color: #2c5282;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+        }
+        .instructions h4 { margin-bottom: 8px; color: #2c5282; }
+        @media (max-width: 480px) {
+            .container { padding: 20px; }
+            .input-group { flex-direction: column; }
+            button { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Поиск заказа</h1>
+        
+        <div class="instructions">
+            <h4>Как использовать:</h4>
+            <p>Введите UID заказа в поле ниже и нажмите "Найти". Результат будет отображен на этой странице.</p>
+        </div>
+
+        <form class="search-form" method="GET" action="/order">
+            <div class="input-group">
+                <input type="text" id="uid" name="uid" placeholder="Введите UID заказа..." 
+                       value="{{.Query}}" required>
+                <button type="submit">Найти</button>
+            </div>
+        </form>
+
+        {{if .Error}}
+        <div class="message error">
+            <p>{{.Error}}</p>
+        </div>
+        {{else if .Success}}
+        <div class="message success">
+            <p>{{.Success}}</p>
+        </div>
+        {{else}}
+        <div class="message">
+            <p>Введите UID заказа для поиска</p>
+        </div>
+        {{end}}
+    </div>
+</body>
+</html>

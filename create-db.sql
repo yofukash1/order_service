@@ -47,9 +47,8 @@ CREATE TABLE orders (
 
 -- Create items table (has many relationship with orders - this represents the []Item array)
 CREATE TABLE items (
-    id SERIAL PRIMARY KEY,
+    chrt_id INTEGER NOT NULL PRIMARY KEY,
     order_uid VARCHAR(255) REFERENCES orders(order_uid) ON DELETE CASCADE,
-    chrt_id INTEGER NOT NULL,
     track_number VARCHAR(255) NOT NULL,
     price INTEGER NOT NULL,
     rid VARCHAR(255) NOT NULL,
